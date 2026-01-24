@@ -8,7 +8,6 @@
         "@bufbuild/protobuf": "^2.0.0",
       },
       "devDependencies": {
-        "@breakingthelines/protos": "^0.0.18",
         "@types/node": "^24.10.1",
         "@vitest/coverage-v8": "4.0.16",
         "bunchee": "^6.9.3",
@@ -16,9 +15,6 @@
         "oxlint": "^1.36.0",
         "typescript": "~5.9.3",
         "vitest": "4.0.16",
-      },
-      "peerDependencies": {
-        "@breakingthelines/protos": ">=0.0.18",
       },
     },
   },
@@ -35,11 +31,7 @@
 
     "@bcoe/v8-coverage": ["@bcoe/v8-coverage@1.0.2", "", {}, "sha512-6zABk/ECA/QYSCQ1NGiVwwbQerUCZ+TQbp64Q3AgmfNvurHH0j8TtXa1qbShXA6qqkpAj4V5W8pP6mLe1mcMqA=="],
 
-    "@breakingthelines/protos": ["@breakingthelines/protos@0.0.18", "https://npm.pkg.github.com/download/@breakingthelines/protos/0.0.18/93ff5c09dd5b375a0391bb3bb1cf64299e5f4fe2", { "peerDependencies": { "@bufbuild/protobuf": "^2.0.0", "@connectrpc/connect": "^2.0.0" } }, "sha512-VXEki3frdrs1XEXAh84Elsd/IapRD59rTdkFswXgtRU99z+05M9QBpXle9FyUXMd9X/M05bqZg4HZ4BYO95Gyg=="],
-
     "@bufbuild/protobuf": ["@bufbuild/protobuf@2.11.0", "", {}, "sha512-sBXGT13cpmPR5BMgHE6UEEfEaShh5Ror6rfN3yEK5si7QVrtZg8LEPQb0VVhiLRUslD2yLnXtnRzG035J/mZXQ=="],
-
-    "@connectrpc/connect": ["@connectrpc/connect@2.1.1", "", { "peerDependencies": { "@bufbuild/protobuf": "^2.7.0" } }, "sha512-JzhkaTvM73m2K1URT6tv53k2RwngSmCXLZJgK580qNQOXRzZRR/BCMfZw3h+90JpnG6XksP5bYT+cz0rpUzUWQ=="],
 
     "@esbuild/aix-ppc64": ["@esbuild/aix-ppc64@0.27.2", "", { "os": "aix", "cpu": "ppc64" }, "sha512-GZMB+a0mOMZs4MpDbj8RJp4cw+w1WV5NYD6xzgvzUJ5Ek2jerwfO2eADyI6ExDSUED+1X8aMbegahsJi+8mgpw=="],
 
