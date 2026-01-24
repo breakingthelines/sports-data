@@ -1,22 +1,20 @@
 import { describe, it, expect, beforeAll } from 'vitest';
-import { readFileSync } from 'node:fs';
-import { resolve, dirname } from 'node:path';
-import { fileURLToPath } from 'node:url';
 
 import { fromStatsBombOpen } from './adapter.js';
 import type { StatsBombEvent } from './types.js';
 import { STATSBOMB_EVENT_TYPES } from './types.js';
-import { safeValidateMatchData, isShotEvent, isPassEvent, isCarryEvent } from '#/core/index.js';
+import { isShot, isPass, isCarry, EventType, PassOutcome } from '#/core/index.js';
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
+// 2022 World Cup Final: Argentina vs France
+const FIXTURE_URL =
+  'https://raw.githubusercontent.com/statsbomb/open-data/master/data/events/3869685.json';
 
 describe('StatsBomb Open adapter', () => {
   let events: StatsBombEvent[];
 
-  beforeAll(() => {
-    const fixturePath = resolve(__dirname, './fixtures/3869685.json');
-    const content = readFileSync(fixturePath, 'utf-8');
-    events = JSON.parse(content) as StatsBombEvent[];
+  beforeAll(async () => {
+    const response = await fetch(FIXTURE_URL);
+    events = (await response.json()) as StatsBombEvent[];
   });
 
   describe('fromStatsBombOpen', () => {
@@ -31,7 +29,7 @@ describe('StatsBomb Open adapter', () => {
         source: {
           provider: 'statsbomb-open',
           name: 'StatsBomb Open Data',
-          logo: expect.any(String),
+          logo: 'https://static.hudl.com/craft/productAssets/statsbomb_icon.svg',
           url: expect.any(String),
         },
       });
@@ -41,15 +39,25 @@ describe('StatsBomb Open adapter', () => {
       const result = fromStatsBombOpen(events);
 
       // 2022 World Cup Final: Argentina vs France
-      expect(result.homeTeam.name).toBe('Argentina');
-      expect(result.awayTeam.name).toBe('France');
+      expect(result.homeTeam?.name).toBe('Argentina');
+      expect(result.awayTeam?.name).toBe('France');
     });
 
-    it('passes schema validation', () => {
+    it('produces valid proto message structure', () => {
       const result = fromStatsBombOpen(events);
-      const validation = safeValidateMatchData(result);
 
-      expect(validation.success).toBe(true);
+      // Verify proto message has required fields
+      expect(result.matchId).toBeDefined();
+      expect(result.homeTeam).toBeDefined();
+      expect(result.awayTeam).toBeDefined();
+      expect(result.events).toBeDefined();
+      expect(result.source).toBeDefined();
+
+      // Verify events have proper structure
+      expect(result.events.length).toBeGreaterThan(0);
+      const firstEvent = result.events[0];
+      expect(firstEvent.id).toBeDefined();
+      expect(firstEvent.type).toBeDefined();
     });
 
     it('applies team overrides from options', () => {
@@ -58,10 +66,10 @@ describe('StatsBomb Open adapter', () => {
         awayTeam: { shortName: 'FRA', primaryColor: '#002654' },
       });
 
-      expect(result.homeTeam.shortName).toBe('ARG');
-      expect(result.homeTeam.primaryColor).toBe('#75AADB');
-      expect(result.awayTeam.shortName).toBe('FRA');
-      expect(result.awayTeam.primaryColor).toBe('#002654');
+      expect(result.homeTeam?.shortName).toBe('ARG');
+      expect(result.homeTeam?.primaryColor).toBe('#75AADB');
+      expect(result.awayTeam?.shortName).toBe('FRA');
+      expect(result.awayTeam?.primaryColor).toBe('#002654');
     });
 
     it('includes custom meta', () => {
@@ -81,7 +89,7 @@ describe('StatsBomb Open adapter', () => {
       const result = fromStatsBombOpen(events);
 
       // Find a pass event with location
-      const passEvent = result.events.find((e) => e.type === 'pass' && e.location);
+      const passEvent = result.events.find((e) => e.type === EventType.PASS && e.location);
 
       expect(passEvent).toBeDefined();
       expect(passEvent!.location!.x).toBeGreaterThanOrEqual(0);
@@ -110,40 +118,42 @@ describe('StatsBomb Open adapter', () => {
   describe('event type mapping', () => {
     it('transforms shot events', () => {
       const result = fromStatsBombOpen(events);
-      const shots = result.events.filter(isShotEvent);
+      const shots = result.events.filter(isShot);
 
       // The 2022 World Cup Final had many shots
       expect(shots.length).toBeGreaterThan(0);
 
       const shot = shots[0];
-      expect(shot.type).toBe('shot');
-      expect(shot.eventData.type).toBe('shot');
-      expect(shot.eventData.xg).toBeGreaterThanOrEqual(0);
-      expect(shot.eventData.xg).toBeLessThanOrEqual(1);
+      expect(shot.type).toBe(EventType.SHOT);
+      expect(shot.eventData.case).toBe('shot');
+      expect(shot.eventData.value.xg).toBeGreaterThanOrEqual(0);
+      expect(shot.eventData.value.xg).toBeLessThanOrEqual(1);
     });
 
     it('transforms pass events', () => {
       const result = fromStatsBombOpen(events);
-      const passes = result.events.filter(isPassEvent);
+      const passes = result.events.filter(isPass);
 
       expect(passes.length).toBeGreaterThan(0);
 
       const pass = passes[0];
-      expect(pass.type).toBe('pass');
-      expect(pass.eventData.type).toBe('pass');
-      expect(['successful', 'unsuccessful']).toContain(pass.eventData.outcome);
+      expect(pass.type).toBe(EventType.PASS);
+      expect(pass.eventData.case).toBe('pass');
+      expect([PassOutcome.SUCCESSFUL, PassOutcome.UNSUCCESSFUL]).toContain(
+        pass.eventData.value.outcome
+      );
     });
 
     it('transforms carry events', () => {
       const result = fromStatsBombOpen(events);
-      const carries = result.events.filter(isCarryEvent);
+      const carries = result.events.filter(isCarry);
 
       expect(carries.length).toBeGreaterThan(0);
 
       const carry = carries[0];
-      expect(carry.type).toBe('carry');
-      expect(carry.eventData.type).toBe('carry');
-      expect(carry.eventData.endLocation).toBeDefined();
+      expect(carry.type).toBe(EventType.CARRY);
+      expect(carry.eventData.case).toBe('carry');
+      expect(carry.eventData.value.endLocation).toBeDefined();
     });
 
     it('filters out unsupported event types', () => {
@@ -174,9 +184,9 @@ describe('StatsBomb Open adapter', () => {
     it('includes StatsBomb Open attribution', () => {
       const result = fromStatsBombOpen(events);
 
-      expect(result.source.provider).toBe('statsbomb-open');
-      expect(result.source.name).toBe('StatsBomb Open Data');
-      expect(result.source.url).toContain('github.com/statsbomb');
+      expect(result.source?.provider).toBe('statsbomb-open');
+      expect(result.source?.name).toBe('StatsBomb Open Data');
+      expect(result.source?.url).toContain('github.com/statsbomb');
     });
   });
 

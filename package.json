@@ -1,11 +1,11 @@
 {
-  "name": "@breakingthelines/data-adapters",
+  "name": "@breakingthelines/sports-data",
   "version": "0.0.1",
-  "description": "Transform external sports data formats into BTL's normalised schema",
+  "description": "Transform external sports data formats into BTL's normalised proto schema",
   "license": "AGPL-3.0",
   "repository": {
     "type": "git",
-    "url": "https://github.com/breakingthelines/data-adapters.git"
+    "url": "https://github.com/breakingthelines/sports-data.git"
   },
   "files": [
     "dist"
@@ -24,17 +24,13 @@
       "types": "./dist/core/index.d.ts",
       "import": "./dist/core/index.js"
     },
-    "./statsbomb-open": {
-      "types": "./dist/statsbomb-open/index.d.ts",
-      "import": "./dist/statsbomb-open/index.js"
-    },
-    "./template": {
-      "types": "./dist/template/index.d.ts",
-      "import": "./dist/template/index.js"
+    "./adapters/statsbomb-open": {
+      "types": "./dist/adapters/statsbomb-open/index.d.ts",
+      "import": "./dist/adapters/statsbomb-open/index.js"
     }
   },
   "publishConfig": {
-    "access": "restricted",
+    "access": "public",
     "registry": "https://npm.pkg.github.com"
   },
   "scripts": {
@@ -46,10 +42,9 @@
     "test": "vitest"
   },
   "dependencies": {
-    "zod": "^3.24.0"
+    "@bufbuild/protobuf": "^2.0.0"
   },
   "devDependencies": {
-    "@breakingthelines/protos": "^0.0.18",
     "@types/node": "^24.10.1",
     "@vitest/coverage-v8": "4.0.16",
     "bunchee": "^6.9.3",
@@ -57,13 +52,5 @@
     "oxlint": "^1.36.0",
     "typescript": "~5.9.3",
     "vitest": "4.0.16"
-  },
-  "peerDependencies": {
-    "@breakingthelines/protos": ">=0.0.18"
-  },
-  "peerDependenciesMeta": {
-    "@breakingthelines/protos": {
-      "optional": true
-    }
   }
 }

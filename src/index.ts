@@ -1,14 +1,14 @@
 /**
  * @breakingthelines/data-adapters
  *
- * Transform external sports data formats into BTL's normalised schema.
+ * Transform external sports data formats into BTL's proto schema.
  */
 
-// Core types and validation
+// Core - proto types and utilities
 export * from './core/index.js';
 
-// StatsBomb Open Data adapter
-export * from './statsbomb-open/index.js';
-
-// Template adapter (for creating new providers)
-export * from './template/index.js';
+// Adapters
+export {
+  fromStatsBombOpen,
+  type FromStatsBombOpenOptions,
+} from './adapters/statsbomb-open/index.js';

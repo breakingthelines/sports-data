@@ -1,13 +1,22 @@
 /**
- * Core module - types, schemas, and validation for normalised match data.
+ * Core module - re-exports proto types and provides utilities.
  */
 
-// Types
-export type {
-  PitchCoordinates,
-  DataSource,
-  Team,
-  Player,
+// Proto types and schemas
+export {
+  // Message types
+  type NormalizedMatchData,
+  type DataSource,
+  type Team,
+  type Player,
+  type PitchCoordinates,
+  type MatchEvent,
+  type ShotEventData,
+  type PassEventData,
+  type TackleEventData,
+  type CarryEventData,
+  type InterceptionEventData,
+  // Enums
   EventType,
   ShotOutcome,
   PassHeight,
@@ -16,49 +25,37 @@ export type {
   DuelType,
   InterceptionOutcome,
   BodyPart,
-  ShotEventData,
-  PassEventData,
-  TackleEventData,
-  CarryEventData,
-  InterceptionEventData,
-  MatchEventData,
-  MatchEvent,
-  NormalizedMatchData,
+  // Schemas
+  NormalizedMatchDataSchema,
+  DataSourceSchema,
+  TeamSchema,
+  PlayerSchema,
+  PitchCoordinatesSchema,
+  MatchEventSchema,
+  ShotEventDataSchema,
+  PassEventDataSchema,
+  TackleEventDataSchema,
+  CarryEventDataSchema,
+  InterceptionEventDataSchema,
+  // Protobuf create helper
+  create,
 } from './types.js';
 
-// Type guards
+// Utilities
 export {
-  isShotEvent,
-  isPassEvent,
-  isTackleEvent,
-  isCarryEvent,
-  isInterceptionEvent,
-} from './types.js';
-
-// Validation schemas
-export {
-  pitchCoordinatesSchema,
-  dataSourceSchema,
-  teamSchema,
-  playerSchema,
-  eventTypeSchema,
-  shotOutcomeSchema,
-  passHeightSchema,
-  passOutcomeSchema,
-  tackleOutcomeSchema,
-  duelTypeSchema,
-  interceptionOutcomeSchema,
-  bodyPartSchema,
-  shotEventDataSchema,
-  passEventDataSchema,
-  tackleEventDataSchema,
-  carryEventDataSchema,
-  interceptionEventDataSchema,
-  matchEventDataSchema,
-  matchEventSchema,
-  normalizedMatchDataSchema,
-} from './validation.js';
-
-// Validation helpers
-export type { ValidationResult } from './validation.js';
-export { validateMatchData, safeValidateMatchData } from './validation.js';
+  // Type guards
+  isShot,
+  isPass,
+  isTackle,
+  isCarry,
+  isInterception,
+  // Enum name helpers
+  eventTypeName,
+  shotOutcomeName,
+  passHeightName,
+  passOutcomeName,
+  tackleOutcomeName,
+  duelTypeName,
+  interceptionOutcomeName,
+  bodyPartName,
+} from './utils.js';
