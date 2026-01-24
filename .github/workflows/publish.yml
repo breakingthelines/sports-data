@@ -39,4 +39,4 @@ jobs:
       - name: Publish to GitHub Packages
         run: bun publish --no-git-checks
         env:
-          BUN_AUTH_TOKEN: ${{ github.token }}
+          GITHUB_TOKEN: ${{ github.token }}
