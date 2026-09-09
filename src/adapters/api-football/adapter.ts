@@ -635,15 +635,17 @@ export function apiFootballReplayStandingsRequest(options: {
  * phase) return one group per group letter.
  *
  * One {@link FootballStandings} is emitted per `response[]` league entry, with
- * every group's entries flattened into a single ranked list. The competition
- * and season ids are taken from the resolution map (the caller resolves the
- * provider league id → canonical `btl_football_competition_*` and the season
- * via identity, exactly as the fixture-list bridge does); when identity has no
- * match they fall back to the same provider-storage id format used elsewhere so
- * the row is still keyed deterministically and is idempotent on re-run. The
- * read path (`GetCompetitionStandings`) filters by `competition_id` only, so a
- * canonical competition id is what makes the standings discoverable — this is
- * why competition resolution is mandatory for the table to render, while the
+ * every group's entries flattened into a single ranked list. The competition id
+ * is taken from the resolution map (the caller resolves the provider league id
+ * → canonical `btl_football_competition_*` via identity, exactly as the
+ * fixture-list bridge does); when identity has no match it falls back to the
+ * same provider-storage id format used elsewhere so the row is still keyed
+ * deterministically and is idempotent on re-run. The season id is ALWAYS the
+ * provider-storage id: seasons are bound by game-service (season_id_bindings,
+ * forward-only) and the connector must not pre-resolve them. The read path
+ * (`GetCompetitionStandings`) filters by `competition_id` only, so a canonical
+ * competition id is what makes the standings discoverable — this is why
+ * competition resolution is mandatory for the table to render, while the
  * season id only needs to be stable.
  *
  * Each {@link FootballStandingEntry}'s `team_id` is the canonical
@@ -676,15 +678,11 @@ export function apiFootballIngestStandingsRequestFromStandings(options: {
         competitionResolved?.entityId ??
         providerStorageId(providerId, 'competition', String(league.id));
 
+      // Seasons are bound by game-service (season_id_bindings, forward-only);
+      // the connector must not pre-resolve them. Always key the standings row
+      // by the provider-scoped season storage id, never a canonical id.
       const seasonProviderId = apiFootballSeasonProviderId(league.id, league.season);
-      const seasonResolved = resolvedEntity(
-        'season',
-        seasonProviderId,
-        `${league.season} ${league.name}`,
-        options.entityResolutions
-      );
-      const seasonId =
-        seasonResolved?.entityId ?? providerStorageId(providerId, 'season', seasonProviderId);
+      const seasonId = providerStorageId(providerId, 'season', seasonProviderId);
 
       // league.standings is an array of GROUPS (each a ranked list of entries).
       // Flatten to one entries list but tag each row with its group label so the
@@ -1130,13 +1128,18 @@ function liveGame(
     competitionSnapshot(response.league),
     { fallbackToProviderRef: true }
   );
+  // Seasons are bound by game-service (season_id_bindings, forward-only); the
+  // connector must not pre-resolve them. Identity resolutions are deliberately
+  // withheld here so the season subject ALWAYS carries the provider-scoped
+  // storage id, and game-service alone decides whether the season gets a
+  // canonical `btl_football_season_*` id or keeps its provider ref.
   const season = resolvedSubject(
     'season',
     options.providerId,
     apiFootballSeasonProviderId(response.league.id, response.league.season),
     SubjectType.SEASON,
     `${response.league.season} ${response.league.name}`,
-    options.entityResolutions,
+    undefined,
     seasonSnapshot(response.league),
     { fallbackToProviderRef: true }
   );

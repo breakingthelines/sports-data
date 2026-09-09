@@ -7,8 +7,11 @@
  * adapter between them:
  *
  *   1. Decode an API-Football `/fixtures?id=<id>` response envelope.
- *   2. Resolve provider teams/players/competition/seasons through identity
- *      where possible, preserving unresolved provider refs when identity misses.
+ *   2. Resolve provider teams/players/competitions through identity where
+ *      possible, preserving unresolved provider refs when identity misses.
+ *      Seasons are never resolved here: game-service binds them
+ *      (season_id_bindings, forward-only) and the connector must not
+ *      pre-resolve them.
  *   3. Resolve the provider fixture id → BTL canonical `game_id` via
  *      `game-service.LookupGameByFixture` (the crosswalk lives in
  *      `provider_game_mappings`, populated by `IngestGames`).
@@ -53,7 +56,6 @@ import {
   apiFootballIngestPlayerMatchStatsRequestFromPlayers,
   apiFootballIngestSquadListRequestFromSquads,
   apiFootballIngestTeamMatchStatsRequestFromStatistics,
-  apiFootballSeasonProviderId,
   type ApiFootballEntityKind,
   type ApiFootballEntityResolutionMap,
   type ApiFootballResolvedEntity,
@@ -155,9 +157,9 @@ export interface MatchConcludedBridgeOptions {
    */
   readonly gameService: FootballGameBridgeClient;
   /**
-   * Identity-server lookup boundary for provider teams, players,
-   * competitions, and seasons. GAME ids still resolve through
-   * `gameService.LookupGameByFixture` above.
+   * Identity-server lookup boundary for provider teams, players, and
+   * competitions (never seasons; game-service binds those). GAME ids still
+   * resolve through `gameService.LookupGameByFixture` above.
    */
   readonly identity: FootballIdentityLookupClient;
   /** Provider id used both for the lookup + observation envelope. */
@@ -1291,20 +1293,10 @@ const resolveFixtureEntities = async (
     log,
     context,
   });
-  await addResolvedEntity({
-    identity,
-    providerId,
-    resolutions,
-    kind: 'season',
-    entityType: EntityType.SEASON,
-    providerIds: [
-      apiFootballSeasonProviderId(fixture.league.id, fixture.league.season),
-      String(fixture.league.season),
-    ],
-    label: `${fixture.league.season} ${fixture.league.name}`,
-    log,
-    context,
-  });
+  // Seasons are deliberately NOT resolved: they are bound by game-service
+  // (season_id_bindings, forward-only) and the connector must not pre-resolve
+  // them. The empty `seasons` bucket makes the mapper emit the provider-storage
+  // season ref unconditionally.
   await addResolvedTeam(identity, providerId, resolutions, fixture.teams.home, log, context);
   await addResolvedTeam(identity, providerId, resolutions, fixture.teams.away, log, context);
   return resolutions;
@@ -1314,12 +1306,12 @@ const resolveFixtureEntities = async (
  * Resolve canonical entities across EVERY fixture in a list envelope, not
  * just the first. A `/fixtures?league&season` response carries many fixtures
  * spanning multiple teams (and, in international tournaments, a stable
- * competition + season). `addResolvedEntity` is keyed by the primary provider
- * id and short-circuits on a hit, so resolving the whole list issues at most
- * one identity lookup per distinct competition / season / team regardless of
- * how many fixtures reference it. Unresolved provider refs are preserved by
- * the mapper, so a partial identity snapshot still yields a valid SCHEDULED
- * game keyed by provider refs.
+ * competition). `addResolvedEntity` is keyed by the primary provider id and
+ * short-circuits on a hit, so resolving the whole list issues at most one
+ * identity lookup per distinct competition / team regardless of how many
+ * fixtures reference it. Seasons are never resolved (game-service binds them).
+ * Unresolved provider refs are preserved by the mapper, so a partial identity
+ * snapshot still yields a valid SCHEDULED game keyed by provider refs.
  */
 const resolveFixtureListEntities = async (
   identity: FootballIdentityLookupClient,
@@ -1341,20 +1333,10 @@ const resolveFixtureListEntities = async (
       log,
       context,
     });
-    await addResolvedEntity({
-      identity,
-      providerId,
-      resolutions,
-      kind: 'season',
-      entityType: EntityType.SEASON,
-      providerIds: [
-        apiFootballSeasonProviderId(fixture.league.id, fixture.league.season),
-        String(fixture.league.season),
-      ],
-      label: `${fixture.league.season} ${fixture.league.name}`,
-      log,
-      context,
-    });
+    // Seasons are deliberately NOT resolved: they are bound by game-service
+    // (season_id_bindings, forward-only) and the connector must not
+    // pre-resolve them. The empty `seasons` bucket makes the mapper emit the
+    // provider-storage season ref unconditionally.
     await addResolvedTeam(identity, providerId, resolutions, fixture.teams.home, log, context);
     await addResolvedTeam(identity, providerId, resolutions, fixture.teams.away, log, context);
   }

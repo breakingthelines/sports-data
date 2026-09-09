@@ -573,13 +573,12 @@ interface CurrentSeasonIngestInput {
  *  - `season_id` MUST match the identifier game-service stores GAMES under so
  *    the stamped anchor season scopes `games` by `(competition_id, season_id)`.
  *    game-service sets `games.season_id = subjectID(game.season)` — the season
- *    SubjectRef's id — and gamewire builds that ref by resolving the provider
- *    season id (`<leagueId>:<year>`) to a canonical SEASON entity via identity,
- *    falling back to the provider-storage id `provider:api-football:season:<leagueId>:<year>`
- *    on a miss (see `resolvedSubject('season', …, { fallbackToProviderRef: true })`
- *    in the fixtures normaliser). We resolve `season_id` here the SAME way, so
- *    the two paths always agree. `provider_season_id` carries the raw provider
- *    `year` for reconciliation.
+ *    SubjectRef's id — and gamewire ALWAYS builds that ref as the
+ *    provider-storage id `provider:api-football:season:<leagueId>:<year>`:
+ *    seasons are bound by game-service (season_id_bindings, forward-only) and
+ *    the connector must not pre-resolve them via identity. We build `season_id`
+ *    here the SAME way, so the two paths always agree. `provider_season_id`
+ *    carries the raw provider `year` for reconciliation.
  *
  * No-ops (with a structured log) when the fetch produced no usable data, when
  * game-service is not wired, when the envelope carries no current season, or
@@ -634,18 +633,15 @@ const ingestCurrentSeason = async (input: CurrentSeasonIngestInput): Promise<voi
     return;
   }
 
-  // Resolve season_id exactly as the fixtures normaliser resolves a game's
-  // season SubjectRef, so current_seasons.season_id === games.season_id.
+  // Build season_id exactly as the fixtures normaliser builds a game's season
+  // SubjectRef, so current_seasons.season_id === games.season_id. Seasons are
+  // bound by game-service (season_id_bindings, forward-only); the connector
+  // must not pre-resolve them, so this is always the provider-storage id.
   const seasonProviderId = apiFootballSeasonProviderId(
     competition.apiFootballLeagueId,
     currentSeason.year
   );
-  const seasonResolved = deps.identity
-    ? await resolveOne(deps.identity, EntityType.SEASON, seasonProviderId)
-    : undefined;
-  const seasonId =
-    seasonResolved?.entityId ??
-    providerStorageId(API_FOOTBALL_PROVIDER_ID, 'season', seasonProviderId);
+  const seasonId = providerStorageId(API_FOOTBALL_PROVIDER_ID, 'season', seasonProviderId);
 
   const request = apiFootballIngestCurrentSeasonRequest({
     replayId: `live:${CURRENT_SEASON_WORKLOAD}:${resourceId}`,
@@ -677,12 +673,13 @@ const ingestCurrentSeason = async (input: CurrentSeasonIngestInput): Promise<voi
 
 /**
  * Build an {@link ApiFootballEntityResolutionMap} for a `/standings` envelope:
- * the competition + season are resolved once from the catalogue entry's
- * provider league id/season, and every team appearing in any standings group is
- * resolved by its provider team id. `resolve` short-circuits per provider id, so
- * one call per distinct competition / season / team is issued regardless of the
- * group count. Identity misses leave the bucket empty and the mapper falls back
- * to provider-storage ids (game-service re-resolves at read time). Returns an
+ * the competition is resolved once from the catalogue entry's provider league
+ * id, and every team appearing in any standings group is resolved by its
+ * provider team id. Seasons are never resolved (game-service binds them;
+ * see below). `resolve` short-circuits per provider id, so one call per
+ * distinct competition / team is issued regardless of the group count.
+ * Identity misses leave the bucket empty and the mapper falls back to
+ * provider-storage ids (game-service re-resolves at read time). Returns an
  * empty map when no identity client is wired.
  */
 const resolveStandingsEntities = async (
@@ -703,14 +700,10 @@ const resolveStandingsEntities = async (
     competitions[leagueId] = competitionResolved;
   }
 
-  const seasonProviderId = apiFootballSeasonProviderId(
-    competition.apiFootballLeagueId,
-    competition.season
-  );
-  const seasonResolved = await resolveOne(identity, EntityType.SEASON, seasonProviderId);
-  if (seasonResolved) {
-    seasons[seasonProviderId] = seasonResolved;
-  }
+  // Seasons are deliberately NOT resolved: they are bound by game-service
+  // (season_id_bindings, forward-only) and the connector must not pre-resolve
+  // them. The `seasons` bucket stays empty so the standings mapper always keys
+  // rows by the provider-storage season id.
 
   for (const providerTeamId of standingsTeamProviderIds(data)) {
     if (teams[providerTeamId] !== undefined) {
