@@ -384,7 +384,7 @@ describe('dailyAnchorWorkflow', () => {
     expect(logs.at(-1)?.event).toBe('daily_anchor.finished');
   });
 
-  it('resolves + ingests the current season via game-service on the current-season step', async () => {
+  it('ingests the current season via game-service with a provider-ref season id', async () => {
     const leaguesEnvelope = {
       response: [
         {
@@ -411,8 +411,11 @@ describe('dailyAnchorWorkflow', () => {
       updatedCount: 0,
       replayId: 'r',
     }));
-    // Resolve the competition (league 999) AND the season ("999:2025") to
-    // canonical ids so season_id matches the canonical SEASON id games carry.
+    // Resolve the competition (league 999) to a canonical id. The season
+    // ("999:2025") stub ALSO returns a hit, deliberately: seasons are bound by
+    // game-service (season_id_bindings, forward-only) and the connector must
+    // not pre-resolve them, so the hit must be ignored and the season must
+    // never even be asked for.
     const resolve = vi.fn(async (req: { entityType: number; providerId: string }) => {
       if (req.providerId === '999') {
         return { found: true, entityId: 'btl_football_competition_l999' };
@@ -456,8 +459,13 @@ describe('dailyAnchorWorkflow', () => {
     expect(request.seasons).toHaveLength(1);
     // competition_id is the CANONICAL id (never the provider league id).
     expect(request.seasons[0]!.competitionId).toBe('btl_football_competition_l999');
-    // season_id is the canonical SEASON id (matches games.season_id).
-    expect(request.seasons[0]!.seasonId).toBe('btl_football_season_s2025');
+    // season_id is ALWAYS the provider-storage id (matches games.season_id),
+    // even though the identity stub above would resolve it: game-service is
+    // the only authority that binds seasons to canonical ids.
+    expect(request.seasons[0]!.seasonId).toBe('provider:api-football:season:999:2025');
+    // The connector never asks identity to resolve the season at all.
+    const resolvedProviderIds = resolve.mock.calls.map((c) => c[0]?.providerId);
+    expect(resolvedProviderIds).not.toContain('999:2025');
     expect(request.seasons[0]!.seasonLabel).toBe('2025/26');
     expect(request.seasons[0]!.providerSeasonId).toBe('2025');
     expect(request.seasons[0]!.startsOn).toBeDefined();

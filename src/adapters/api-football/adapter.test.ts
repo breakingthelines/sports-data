@@ -265,7 +265,7 @@ describe('API-Football adapter', () => {
     expect(football.penalties).toBeUndefined();
   });
 
-  it('uses identity-resolved subjects when supplied and keeps unresolved provider refs honest', () => {
+  it('uses identity-resolved subjects when supplied, except seasons which stay provider refs', () => {
     const request = apiFootballIngestGamesRequestFromFixtures({
       replayId: 'live:fixture-detail-fullTime:1917',
       resourceId: '1917',
@@ -318,7 +318,11 @@ describe('API-Football adapter', () => {
 
     const game = request.games[0];
     expect(game?.competition?.id).toBe('btl_football_competition_lb3d230cb');
-    expect(game?.season?.id).toBe('btl_football_season_sdc8762eb');
+    // The seasons stub above deliberately returns a hit and it must be
+    // IGNORED: seasons are bound by game-service (season_id_bindings,
+    // forward-only), so the connector always sends the provider-storage
+    // season ref, never a canonical id it did not mint.
+    expect(game?.season?.id).toBe('provider:api-football:season:39:2025');
     expect(game?.participants[0]?.subject?.id).toBe('btl_football_team_t8596499a');
     expect(game?.participants[0]?.subject?.imageUrl).toBe(
       'https://media.api-sports.io/football/teams/42.png'
@@ -1069,7 +1073,7 @@ describe('API-Football standings mapping', () => {
     ],
   });
 
-  it('maps a /standings envelope to canonical ids and flattens entries', () => {
+  it('maps a /standings envelope to canonical ids (except seasons) and flattens entries', () => {
     const request = apiFootballIngestStandingsRequestFromStandings({
       replayId: 'live:competition-standings:standings-39-2025',
       resourceId: 'standings-39-2025',
@@ -1088,7 +1092,10 @@ describe('API-Football standings mapping', () => {
     expect(request.standings).toHaveLength(1);
     const table = request.standings[0]!;
     expect(table.competitionId).toBe('btl_football_competition_lb3d230cb');
-    expect(table.seasonId).toBe('btl_football_season_s39');
+    // The seasons stub returns a hit and it must be IGNORED: seasons are
+    // bound by game-service (season_id_bindings, forward-only), so standings
+    // are always keyed by the provider-storage season id.
+    expect(table.seasonId).toBe('provider:api-football:season:39:2025');
     // The malformed (team id 0) row is dropped; the two valid rows remain.
     expect(table.entries).toHaveLength(2);
 

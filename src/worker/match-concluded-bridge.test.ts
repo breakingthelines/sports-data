@@ -1514,9 +1514,13 @@ describe('createMatchConcludedBridge — fixtures list (SCHEDULED game mint)', (
     const bridge = createMatchConcludedBridge({
       publisher,
       gameService: gameService.client,
-      // Resolve the competition + both teams of the first fixture to canonical ids.
+      // Resolve the competition + both teams of the first fixture to canonical
+      // ids. The season entry ('1:2026') is a deliberate trap: seasons are
+      // bound by game-service (season_id_bindings, forward-only) and the
+      // connector must not pre-resolve them, so this hit must never be used.
       identity: resolvingIdentity({
         '1': 'btl_football_competition_world_cup',
+        '1:2026': 'btl_football_season_wc26',
         '16': 'btl_football_team_mexico',
         '1531': 'btl_football_team_south_africa',
       }),
@@ -1533,6 +1537,9 @@ describe('createMatchConcludedBridge — fixtures list (SCHEDULED game mint)', (
     const game = gameService.ingestCalls[0]?.games[0];
     // Canonical competition id flows onto the game's competition SubjectRef.
     expect(game?.competition?.id).toBe('btl_football_competition_world_cup');
+    // The season stays a provider ref even though identity would resolve it:
+    // game-service alone binds seasons to canonical ids.
+    expect(game?.season?.id).toBe('provider:api-football:season:1:2026');
     // Canonical participant (team) ids flow onto the participants.
     const participantIds = (game?.participants ?? []).map((p) => p.subject?.id);
     expect(participantIds).toContain('btl_football_team_mexico');
