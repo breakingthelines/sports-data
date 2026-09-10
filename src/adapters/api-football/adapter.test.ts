@@ -624,6 +624,11 @@ describe('API-Football adapter', () => {
               },
             ],
             substitutes: [],
+            coach: {
+              id: 18,
+              name: 'M. Arteta',
+              photo: 'https://media.api-sports.io/football/coachs/18.png',
+            },
           },
         ],
       },
@@ -633,6 +638,16 @@ describe('API-Football adapter', () => {
     expect(request.lineups[0]?.teamSheets[0]?.teamId).toBe('provider:api-football:team:42');
     expect(request.lineups[0]?.teamSheets[0]?.players[0]?.playerId).toBe(
       'provider:api-football:player:1460'
+    );
+    // Coach rides the team sheet with a provider-scheme id (the player id
+    // convention); canonicalisation to btl_football_coach_* is identity's
+    // concern, never the adapter's.
+    expect(request.lineups[0]?.teamSheets[0]?.coach?.coachId).toBe(
+      'provider:api-football:coach:18'
+    );
+    expect(request.lineups[0]?.teamSheets[0]?.coach?.name).toBe('M. Arteta');
+    expect(request.lineups[0]?.teamSheets[0]?.coach?.photoUrl).toBe(
+      'https://media.api-sports.io/football/coachs/18.png'
     );
   });
 
@@ -670,6 +685,10 @@ describe('API-Football adapter', () => {
     // proto3 `formation` has no null variant; a provider null degrades to the
     // idiomatic empty string rather than being dropped.
     expect(request.lineups[0]?.teamSheets[0]?.formation).toBe('');
+    // No coach in the source payload (API-Football occasionally omits it):
+    // the sheet stays valid and carries no coach ref at all, never a
+    // zero-valued one.
+    expect(request.lineups[0]?.teamSheets[0]?.coach).toBeUndefined();
   });
 
   it('normalizes API-Football squad lists as a distinct lineup fallback', () => {
