@@ -65,6 +65,7 @@ import {
   FootballSquadListTeamSchema,
   FootballStandingEntrySchema,
   FootballStandingsSchema,
+  FootballCoachRefSchema,
   FootballTeamSheetPlayerSchema,
   FootballTeamSheetSchema,
   FootballTimelineEventType,
@@ -1386,6 +1387,25 @@ function teamSheetFromLineup(
         })
       ),
     ],
+    // Coach is optional on the provider side (occasionally omitted) and never
+    // a validity condition; a sheet without one carries no ref at all rather
+    // than a zero-valued one. The id enters provider-scheme
+    // (provider:api-football:coach:NNN), matching the team-sheet player
+    // convention — canonicalisation to btl_football_coach_* is an
+    // identity/crosswalk concern, never done at this boundary.
+    coach: coachRefFromLineup(lineup, options.providerId),
+  });
+}
+
+function coachRefFromLineup(lineup: ApiFootballLineupResponse, providerId: string) {
+  const coach = lineup.coach;
+  if (!coach || typeof coach.id !== 'number' || !Number.isFinite(coach.id)) {
+    return undefined;
+  }
+  return create(FootballCoachRefSchema, {
+    coachId: providerStorageId(providerId, 'coach', coach.id),
+    name: stringOrEmpty(coach.name),
+    photoUrl: stringOrEmpty(coach.photo),
   });
 }
 

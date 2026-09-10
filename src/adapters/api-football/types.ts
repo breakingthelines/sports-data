@@ -137,6 +137,17 @@ export interface ApiFootballLineupResponse {
   readonly formation: string | null;
   readonly startXI: readonly ApiFootballLineupPlayer[];
   readonly substitutes: readonly ApiFootballLineupPlayer[];
+  /**
+   * Head coach named on this team sheet. API-Football provides this on the
+   * lineups endpoint but occasionally omits it, so it is optional and never
+   * a validity condition for the lineup — a sheet without a coach is still a
+   * complete lineup. `photo` follows the provider's media CDN URL shape.
+   */
+  readonly coach?: {
+    readonly id: number;
+    readonly name: string;
+    readonly photo?: string | null;
+  } | null;
 }
 
 export interface ApiFootballLineupPlayer {
