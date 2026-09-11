@@ -130,6 +130,29 @@ jobs:
           : "${COMPOSE_ID:?COMPOSE_ID must be set}"
 
           DOKPLOY_URL="${DOKPLOY_URL%/}"
+
+          print_safe_fields() {
+            # Dokploy API responses are secret-bearing by default: the compose object
+            # embeds the ENTIRE staging environment in .env, and deployment records can
+            # carry command output. gamewire is a PUBLIC repo, so these logs are world
+            # readable. Never echo a response body - print an explicit allowlist only.
+            if [ ! -s "$1" ]; then
+              echo "  (empty response body)"
+              return 0
+            fi
+            jq -r '
+              def pick: {composeId, name, composeStatus, deploymentId, status, createdAt}
+                        | with_entries(select(.value != null));
+              (if type == "array" then (.[:10] | map(pick))
+               elif type == "object" then [pick]
+               else [] end)
+              | map(to_entries | map("\(.key)=\(.value)") | join(" "))
+              | map(select(length > 0))
+              | if length == 0 then ["  (no allowlisted fields in response)"]
+                else map("  " + .) end
+              | .[]
+            ' "$1" 2>/dev/null || echo "  (response body withheld: not JSON)"
+          }
           COMPOSE_ACTION="${COMPOSE_ACTION:-redeploy}"
           COMPOSE_NAME="${COMPOSE_NAME:-compose}"
           DEPLOY_TITLE="${DEPLOY_TITLE:-}"
@@ -197,8 +220,7 @@ jobs:
             --data @/tmp/dokploy-compose-payload.json)"
 
           echo "Dokploy ${COMPOSE_ACTION} HTTP status: ${TRIGGER_HTTP_CODE}"
-          cat /tmp/dokploy-trigger-response.json
-          echo
+          print_safe_fields /tmp/dokploy-trigger-response.json
 
           if [ "${TRIGGER_HTTP_CODE}" -lt 200 ] || [ "${TRIGGER_HTTP_CODE}" -ge 300 ]; then
             echo "::error::Dokploy ${COMPOSE_ACTION} failed for ${COMPOSE_NAME} (${COMPOSE_ID}) with HTTP ${TRIGGER_HTTP_CODE}"
@@ -238,7 +260,7 @@ jobs:
 
           if errors:
               print("Dokploy accepted the request but returned an authorization error payload.", file=sys.stderr)
-              print(json.dumps(errors, indent=2), file=sys.stderr)
+              print(f"Matched {len(errors)} authorization error node(s); body withheld.", file=sys.stderr)
               sys.exit(1)
           PY
 
@@ -252,7 +274,7 @@ jobs:
 
             if [ "${STATUS_HTTP_CODE}" -lt 200 ] || [ "${STATUS_HTTP_CODE}" -ge 300 ]; then
               echo "::error::Dokploy deployment status lookup failed for ${COMPOSE_NAME} (${COMPOSE_ID}) with HTTP ${STATUS_HTTP_CODE}"
-              cat /tmp/dokploy-deployments-response.json
+              print_safe_fields /tmp/dokploy-deployments-response.json
               exit 1
             fi
 
@@ -310,8 +332,8 @@ jobs:
                 exit 0
                 ;;
               error|failed|cancelled|canceled)
-                echo "::error::Dokploy deployment ${DEPLOYMENT_ID} failed for ${COMPOSE_NAME}"
-                cat /tmp/dokploy-deployments-response.json
+                echo "::error::Dokploy deployment ${DEPLOYMENT_ID} failed for ${COMPOSE_NAME} (${COMPOSE_ID}): status=${DEPLOYMENT_STATUS}, deployment.allByCompose HTTP ${STATUS_HTTP_CODE}"
+                print_safe_fields /tmp/dokploy-deployments-response.json
                 exit 1
                 ;;
             esac
@@ -320,7 +342,7 @@ jobs:
           done
 
           echo "::error::Timed out waiting for Dokploy to finish ${COMPOSE_ACTION} for ${COMPOSE_NAME} (${COMPOSE_ID})"
-          cat /tmp/dokploy-deployments-response.json
+          print_safe_fields /tmp/dokploy-deployments-response.json
           exit 1
           EOF
 
